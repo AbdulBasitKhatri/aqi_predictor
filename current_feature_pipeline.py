@@ -60,25 +60,43 @@ def create_features(df):
         df["so2"] +
         df["o3"] +
         df["co"]
-    ).astype("float64")
+    )
 
     df["temp_humidity_index"] = (
         df["temp"] * df["humidity"] / 100
-    ).astype("float64")
+    )
 
     df["wind_temp_ratio"] = (
         df["wind_speed"] / (df["temp"].abs() + 0.1)
-    ).astype("float64")
-
-    df["target_aqi"] = df["aqi"].astype("float64")
+    )
 
     aqi_change_rate = df["aqi"].diff().fillna(0).astype("float64")
     df["aqi_change_rate"] = aqi_change_rate
-    df["temp"] = df["temp"].astype("float64")
+    df["target_aqi"] = df["aqi"].shift(-1)
     df["humidity"] = df["humidity"].astype("int64")
-    df["wind_speed"] = df["wind_speed"].astype("float64")
 
-    df["aqi_change_rate"] = df["aqi_change_rate"].astype("float64")
+    #integer columns
+    df["aqi"] = df["aqi"].astype("int64")
+
+    #double columns
+    double_cols = [
+        "pm25",
+        "pm10",
+        "no2",
+        "so2",
+        "o3",
+        "co",
+        "temp",
+        "wind_speed",
+        "pollutant_sum",
+        "temp_humidity_index",
+        "wind_temp_ratio",
+        "aqi_change_rate",
+        "target_aqi"
+    ]
+
+    for col in double_cols:
+        df[col] = df[col].astype("float64")
 
     return df
 

@@ -131,9 +131,10 @@ def upload_to_hopsworks(df):
 
     fg.insert(df)
 
-#build dataframe
-df = build_dataframe()
-print(df.head())
+if __name__ == "__main__":
+    #build dataframe
+    df = build_dataframe()
+    print(df.head())
 
-upload_to_hopsworks(df)
-print("Current AQI uploaded successfully!")
+    upload_to_hopsworks(df)
+    print("Current AQI uploaded successfully!")

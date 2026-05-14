@@ -3,5 +3,4 @@ pandas
 requests
 scikit-learn
 joblib
-streamlit
-hopsworks
+hopsworks[python]

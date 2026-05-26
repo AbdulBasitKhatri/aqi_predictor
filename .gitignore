@@ -1,2 +1,4 @@
 .env
 certs/
+aqi_model/
+catboost_info/

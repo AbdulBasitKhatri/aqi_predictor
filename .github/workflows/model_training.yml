@@ -1,10 +1,10 @@
-name: Feature Insert Pipeline
+name: Feature Training Pipeline
 
 on:
   schedule:
-    - cron: "0 * * * *"   # every hour
+    - cron: "0 0 * * *"   # Runs every day at midnight (UTC)
 
-  workflow_dispatch:      # allows manual run
+  workflow_dispatch:      # Allows manual run from the Actions tab
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -27,8 +27,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run AQI pipeline
+      - name: Run Training pipeline
         env:
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
-        run: python current_feature_pipeline.py
+        run: python training_pipeline.py

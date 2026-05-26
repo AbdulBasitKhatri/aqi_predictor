@@ -1,6 +1,14 @@
 python-dotenv
 pandas
+numpy
 requests
 scikit-learn
 joblib
 hopsworks[python]
+xgboost
+lightgbm
+catboost
+matplotlib
+seaborn
+shap
+lime

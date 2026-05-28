@@ -21,7 +21,7 @@ st.set_page_config(
 )
 
 # Fetch API key from .env file
-HOPSWORKS_API_KEY = os.getenv("HOPSWORKS_API_KEY")
+HOPSWORKS_API_KEY = os.getenv("HOPSWORKS_API_KEY") or st.secrets.get("HOPSWORKS_API_KEY")
 
 if not HOPSWORKS_API_KEY:
     st.error("❌ `HOPSWORKS_API_KEY` not found in your environment (.env file).")

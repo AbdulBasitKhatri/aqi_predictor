@@ -284,7 +284,6 @@ with tab3:
         with open(lime_path, 'r', encoding='utf-8') as f:
             html_content = f.read()
         
-        # Inject styling wrapper to force a clean, highly readable white background block
         styled_html = f"""
         <div style="background-color: #FFFFFF; color: #000000; padding: 15px; border-radius: 8px; min-height: 760px;">
             {html_content}

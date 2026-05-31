@@ -86,58 +86,61 @@ df = fg.read()
 
 print(f"Dataset shape: {df.shape}")
 
-#preprocessing
+# Preprocessing
 print("Performing preprocessing...")
-
 df["timestamp"] = pd.to_datetime(df["timestamp"])
-
 df = df.sort_values("timestamp")
 
-#time features
-df["aqi_lag_1"] = df["aqi"].shift(1)
-df["aqi_lag_3"] = df["aqi"].shift(3)
-df["aqi_lag_6"] = df["aqi"].shift(6)
+# --- FIX 1: Resample to uniform hourly timeline to fix random hours ---
+df.set_index("timestamp", inplace=True)
 
-df["aqi_rolling_mean"] = df["aqi"].rolling(6).mean()
-df["aqi_rolling_std"] = df["aqi"].rolling(6).std()
+# Resample to hourly frequency. For duplicate hours, we take the mean.
+df_hourly = df.resample("h").mean(numeric_only=True)
 
-#target variable next hour AQI
-df["target_aqi"] = df["aqi"].shift(-1)
+# Interpolate the missing random hours linearly so the time sequence is perfectly continuous
+df_hourly = df_hourly.interpolate(method="linear")
 
-#remove rows with missing values
-df = df.dropna()
+# --- FIX 2: Create precise hourly calendar features ---
+df_hourly["hour"] = df_hourly.index.hour
+df_hourly["day"] = df_hourly.index.day
+df_hourly["month"] = df_hourly.index.month
+df_hourly["day_of_week"] = df_hourly.index.dayofweek
 
-print(f"Dataset after preprocessing: {df.shape}")
+# --- FIX 3: Clean Hourly Lag and Rolling features ---
+df_hourly["aqi_lag_1"] = df_hourly["aqi"].shift(1)   # 1 hour ago
+df_hourly["aqi_lag_3"] = df_hourly["aqi"].shift(3)   # 3 hours ago
+df_hourly["aqi_lag_6"] = df_hourly["aqi"].shift(6)   # 6 hours ago
+df_hourly["aqi_lag_24"] = df_hourly["aqi"].shift(24) # 24 hours ago (yesterday at same time)
 
-#select features that are useful for modeling
+# Rolling windows adjusted for hourly scales (6-hour window and 24-hour window)
+df_hourly["aqi_rolling_mean_6h"] = df_hourly["aqi"].rolling(6).mean()
+df_hourly["aqi_rolling_std_6h"] = df_hourly["aqi"].rolling(6).std()
+df_hourly["aqi_rolling_mean_24h"] = df_hourly["aqi"].rolling(24).mean()
+
+# --- FIX 4: Single target for the NEXT HOUR ---
+df_hourly["target_aqi"] = df_hourly["aqi"].shift(-1)
+
+# Remove rows with missing values caused by lookbacks/target shifts
+df_hourly = df_hourly.dropna()
+
+print(f"Dataset after preprocessing: {df_hourly.shape}")
+
+# Features optimized for hourly modeling
 FEATURES = [
-    "pm25",
-    "pm10",
-    "no2",
-    "so2",
-    "o3",
-    "co",
-    "temp",
-    "humidity",
-    "wind_speed",
-    "hour",
-    "day",
-    "month",
-    "day_of_week",
-    "aqi_lag_1",
-    "aqi_lag_3",
-    "aqi_lag_6",
-    "aqi_rolling_mean",
-    "aqi_rolling_std"
+    "pm25", "pm10", "no2", "so2", "o3", "co",
+    "temp", "humidity", "wind_speed",
+    "hour", "day", "month", "day_of_week",
+    "aqi_lag_1", "aqi_lag_3", "aqi_lag_6", "aqi_lag_24",
+    "aqi_rolling_mean_6h", "aqi_rolling_std_6h", "aqi_rolling_mean_24h"
 ]
 
 TARGET = "target_aqi"
 
-X = df[FEATURES]
-y = df[TARGET]
+X = df_hourly[FEATURES]
+y = df_hourly[TARGET]
 
-#split data into train and test sets
-split_index = int(len(df) * 0.8)
+# Split data into train and test sets chronologically
+split_index = int(len(df_hourly) * 0.8)
 
 X_train = X.iloc[:split_index]
 X_test = X.iloc[split_index:]

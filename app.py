@@ -104,6 +104,7 @@ def fetch_feature_group_data(api_key):
     project = hopsworks.login(api_key_value=api_key)
     fs = project.get_feature_store()
     fg = fs.get_feature_group(name="karachi_aqi_fg", version=1)
+    fg.read().to_csv("feature_group_data.csv", index=False)
     return fg.read()
 
 df = fetch_feature_group_data(HOPSWORKS_API_KEY)
@@ -127,7 +128,7 @@ df["aqi_rolling_std"] = df[aqi_source_col].rolling(6).std()
 def get_aqi_status(aqi_val):
     """Categorize OpenWeather standard 1-5 AQI brackets"""
     # Round to the nearest whole index since OpenWeather scales discretely from 1 to 5
-    aqi_round = int(round(aqi_val))
+    aqi_round = int(aqi_val)
     
     if aqi_round <= 1:
         return "Good", "🟢"
@@ -150,38 +151,67 @@ if os.path.exists(model_path):
         if hasattr(model.named_steps["scaler"], "feature_names_in_"):
             feature_names = list(model.named_steps["scaler"].feature_names_in_)
         else:
-            # Complete fallback matching your explicit time structure 
-            feature_names = ["aqi", "aqi_lag_1", "aqi_lag_3", "aqi_lag_6", "aqi_rolling_mean", "aqi_rolling_std"]
+            feature_names = [
+                "pm25", "pm10", "no2", "so2", "o3", "co",
+                "temp", "humidity", "wind_speed",
+                "hour", "day", "month", "day_of_week",
+                "aqi_lag_1", "aqi_lag_3", "aqi_lag_6", "aqi_lag_24",
+                "aqi_rolling_mean_6h", "aqi_rolling_std_6h", "aqi_rolling_mean_24h"
+            ]
 
-        # Ensure we drop lookback rows containing NaNs
-        df_clean = df.dropna(subset=["aqi_lag_6", "aqi_rolling_std"]).copy()
+        df_features = df.copy()
+        
+        # Calculate the 24-hour lag and rolling windows that the model expects
+        df_features["aqi_lag_1"] = df_features[aqi_source_col].shift(1)
+        df_features["aqi_lag_3"] = df_features[aqi_source_col].shift(3)
+        df_features["aqi_lag_6"] = df_features[aqi_source_col].shift(6)
+        df_features["aqi_lag_24"] = df_features[aqi_source_col].shift(24)
+        
+        df_features["aqi_rolling_mean_6h"] = df_features[aqi_source_col].rolling(6).mean()
+        df_features["aqi_rolling_std_6h"] = df_features[aqi_source_col].rolling(6).std()
+        df_features["aqi_rolling_mean_24h"] = df_features[aqi_source_col].rolling(24).mean()
+
+        # Ensure we drop lookback rows containing NaNs now that they are created
+        df_clean = df_features.dropna(subset=["aqi_lag_24", "aqi_rolling_mean_24h"]).copy()
         if df_clean.empty:
-            df_clean = df.copy()
+            df_clean = df_features.copy()
             
-        # Get the single latest real row (retains structural weather/pollutants info)
+        # Get the single latest hourly row (contains current weather/pollutants info)
         latest_row = df_clean.iloc[-1].copy()
-        latest_aqi_values = df_clean.tail(6)[aqi_source_col].astype(float).tolist()
+        
+        # Extract 24 entries of hourly history for the rolling tracking windows
+        latest_aqi_values = df_clean.tail(24)[aqi_source_col].astype(float).tolist()
 
-        # 4. Generate prediction arrays recursively (72 hours ahead)
+        # --- FIX 1: Run recursive loop for 72 hourly steps ahead ---
         predictions_pool = []
-        history = latest_aqi_values.copy()
+        history = latest_aqi_values.copy() 
         
         # Create a mutable dictionary based on the latest real data point
         current_features = latest_row.to_dict()
 
         for step in range(72):
-            # Dynamic rolling time updates
-            current_features["aqi"] = history[-1]
-            current_features["aqi_lag_1"] = history[-2]
-            current_features["aqi_lag_3"] = history[-4]
+            # Update Lags and Rolling Windows Hour-by-Hour
+            current_features["aqi_lag_1"] = history[-1]
+            current_features["aqi_lag_3"] = history[-3]
             current_features["aqi_lag_6"] = history[-6]
-            current_features["aqi_rolling_mean"] = np.mean(history[-6:])
-            current_features["aqi_rolling_std"] = np.std(history[-6:]) if np.std(history[-6:]) > 0 else 0.0
+            current_features["aqi_lag_24"] = history[-24]
             
-            # Map calendar attributes smoothly out into the future
-            future_time = pd.to_datetime(latest_row[time_source_col]) + datetime.timedelta(hours=step+1)
+            # Recalculate rolling 6h and 24h stats dynamically
+            current_features["aqi_rolling_mean_6h"] = np.mean(history[-6:])
+            current_features["aqi_rolling_std_6h"] = np.std(history[-6:]) if np.std(history[-6:]) > 0 else 0.0
+            current_features["aqi_rolling_mean_24h"] = np.mean(history[-24:])
             
-            # Handle variable names dynamically if present in your model training
+            # Map hourly calendar attributes smoothly out into the future
+            base_date = pd.to_datetime(latest_row[time_source_col]) if time_source_col in latest_row else pd.to_datetime(latest_row.name)
+            future_time = base_date + datetime.timedelta(hours=step+1)
+            time_factor = math.sin(2 * np.pi * future_time.hour / 24.0)
+            current_features["temp"] = latest_row["temp"] + (time_factor * 3.0) # fluctuates +/- 3 degrees
+            current_features["humidity"] = max(10, min(100, latest_row["humidity"] - (time_factor * 10)))
+            decay_rate = 0.95 ** step
+            for pollutant in ["pm25", "pm10", "no2", "so2", "o3", "co"]:
+                if pollutant in current_features:
+                    current_features[pollutant] = latest_row[pollutant] * decay_rate
+            # Update calendar attributes dynamically for each future hour slot
             if "hour" in current_features: current_features["hour"] = future_time.hour
             if "day" in current_features: current_features["day"] = future_time.day
             if "month" in current_features: current_features["month"] = future_time.month
@@ -191,29 +221,33 @@ if os.path.exists(model_path):
             # Align inputs exactly to match feature_names format
             df_inference_row = pd.DataFrame([current_features], columns=feature_names)
             
-            # Predict the next hour AQI
-            next_hour_pred = float(model.predict(df_inference_row)[0])
+            # Predict the next hour's AQI
+            pred_val = model.predict(df_inference_row)
+            next_hour_pred = float(pred_val[0]) if hasattr(pred_val, "__len__") else float(pred_val)
             predictions_pool.append(next_hour_pred)
             
-            # Append output back into tracking window state
+            # Append prediction to history to feed subsequent steps
             history.append(next_hour_pred)
 
-        # 5. Extract daily target forecasts from your hourly output arrays
+        # --- FIX 2: Aggregate 72 hours of predictions into 3 separate calendar days ---
         tomorrow_aqi = np.max(predictions_pool[0:24])
         day_after_aqi = np.max(predictions_pool[24:48])
-        three_days_aqi = np.max(predictions_pool[48:72])
+        two_days_after_aqi = np.max(predictions_pool[48:72])
         
-        predictions = [tomorrow_aqi, day_after_aqi, three_days_aqi]
+        predictions = [tomorrow_aqi, day_after_aqi, two_days_after_aqi]
         
+        # Create timestamps for upcoming daily forecasts
         today = datetime.date.today()
         forecast_dates = [today + datetime.timedelta(days=i) for i in range(1, 4)]
 
-        # Display forecast cards side-by-side
+        # --- FIX 3: Display daily forecast cards side-by-side ---
         pred_cols = st.columns(3)
         for index, target_date in enumerate(forecast_dates):
-            aqi_val = max(1, min(5, math.floor(predictions[index])))  
+            raw_val = predictions[index]
+            aqi_val = max(1, min(5, math.trunc(raw_val))) if not np.isnan(raw_val) else 1
+            
             status, emoji = get_aqi_status(aqi_val)
-            day_label = target_date.strftime("%B %d, %Y")
+            day_label = target_date.strftime("%B %d, %Y") # Format clean day view e.g., "June 01, 2026"
 
             with pred_cols[index]:
                 st.markdown(
@@ -229,7 +263,6 @@ if os.path.exists(model_path):
 
         # Format final view to display features cleanly 
         df_display_vector = pd.DataFrame([current_features], columns=feature_names)
-
         st.write(" ")
 
     except Exception as e:

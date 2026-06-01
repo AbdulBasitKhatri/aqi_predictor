@@ -19,8 +19,6 @@ load_dotenv()
 
 LAT = 24.86
 LON = 67.01
-df = None
-project = None
 
 st.set_page_config(
     page_title="Karachi AQI Predictor Dashboard",
@@ -79,18 +77,19 @@ def get_air_pollution():
         st.error(f"Error fetching air pollution data: {e}")
         return None
 
+@st.cache_data(show_spinner="...")
 def fetch_feature_group_data(api_key):
-    global df, project
+    project = hopsworks.login(api_key_value=HOPSWORKS_API_KEY)
     fs = project.get_feature_store()
     fg = fs.get_feature_group(name="karachi_aqi_fg", version=1)
     df = fg.read()
     df.to_csv("feature_group_data.csv", index=False)
+    return df
 
 @st.cache_resource(show_spinner="Connecting to Hopsworks Model Registry...")
 def download_latest_model_assets(api_key):
     try:
         # Authenticate and login to Hopsworks
-        global project
         project = hopsworks.login(api_key_value=api_key)
         mr = project.get_model_registry()
         
@@ -220,7 +219,7 @@ st.header("🔮 3-Day AQI Forecast Inference", divider="green")
 model_path = get_asset_path("best_aqi_model.pkl")
 
 #hopsworks case-insensitive column handling fix
-fetch_feature_group_data(HOPSWORKS_API_KEY)
+df = fetch_feature_group_data(HOPSWORKS_API_KEY)
 available_cols = {col.lower(): col for col in df.columns}
 aqi_source_col = available_cols.get("aqi", "aqi")
 time_source_col = available_cols.get("timestamp", "timestamp")

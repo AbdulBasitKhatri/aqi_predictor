@@ -79,7 +79,6 @@ def get_air_pollution():
         st.error(f"Error fetching air pollution data: {e}")
         return None
 
-@st.cache_data(show_spinner="Loading...")
 def fetch_feature_group_data(api_key):
     global df, project
     fs = project.get_feature_store()
@@ -113,7 +112,6 @@ def download_latest_model_assets(api_key):
 
 #run the cached function to pull files down
 model_version, local_asset_dir = download_latest_model_assets(HOPSWORKS_API_KEY)
-fetch_feature_group_data(HOPSWORKS_API_KEY)
 
 if not local_asset_dir:
     st.stop()
@@ -222,6 +220,7 @@ st.header("🔮 3-Day AQI Forecast Inference", divider="green")
 model_path = get_asset_path("best_aqi_model.pkl")
 
 #hopsworks case-insensitive column handling fix
+fetch_feature_group_data(HOPSWORKS_API_KEY)
 available_cols = {col.lower(): col for col in df.columns}
 aqi_source_col = available_cols.get("aqi", "aqi")
 time_source_col = available_cols.get("timestamp", "timestamp")

@@ -319,7 +319,7 @@ if os.path.exists(model_path):
         two_days_after_aqi = np.max(predictions_pool[48:72])
         predictions = [tomorrow_aqi, day_after_aqi, two_days_after_aqi]
         
-        today_karachi = datetime.now(ZoneInfo("Asia/Karachi"))
+        today_karachi = datetime.datetime.now(ZoneInfo("Asia/Karachi"))
         forecast_dates = [today_karachi + timedelta(days=i) for i in range(1, 4)]
 
         #forecast display cards

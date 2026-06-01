@@ -105,7 +105,6 @@ def download_latest_model_assets(api_key):
         
         # Download all model files (artifacts) into a local folder
         download_dir = latest_model_meta.download()
-        fetch_feature_group_data(HOPSWORKS_API_KEY)
         return latest_model_meta.version, download_dir
         
     except Exception as e:
@@ -114,6 +113,7 @@ def download_latest_model_assets(api_key):
 
 #run the cached function to pull files down
 model_version, local_asset_dir = download_latest_model_assets(HOPSWORKS_API_KEY)
+fetch_feature_group_data(HOPSWORKS_API_KEY)
 
 if not local_asset_dir:
     st.stop()

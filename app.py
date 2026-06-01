@@ -3,12 +3,14 @@ import joblib
 import pandas as pd
 import numpy as np
 import datetime
+from datetime import timedelta
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
 import hopsworks
 import math
+from zoneinfo import ZoneInfo
 
 # ---------------------------------------------------------
 # 1. INITIAL SETUP & HOPSWORKS CONNECTION
@@ -318,8 +320,8 @@ if os.path.exists(model_path):
         two_days_after_aqi = np.max(predictions_pool[48:72])
         predictions = [tomorrow_aqi, day_after_aqi, two_days_after_aqi]
         
-        today = datetime.date.today()
-        forecast_dates = [today + datetime.timedelta(days=i) for i in range(1, 4)]
+        today_karachi = datetime.now(ZoneInfo("Asia/Karachi"))
+        forecast_dates = [today_karachi + timedelta(days=i) for i in range(1, 4)]
 
         #forecast display cards
         pred_cols = st.columns(3)

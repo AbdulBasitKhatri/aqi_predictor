@@ -83,7 +83,6 @@ def fetch_feature_group_data(api_key):
     fs = project.get_feature_store()
     fg = fs.get_feature_group(name="karachi_aqi_fg", version=1)
     df = fg.read()
-    df.to_csv("feature_group_data.csv", index=False)
     return df
 
 @st.cache_resource(show_spinner="Connecting to Hopsworks Model Registry...")

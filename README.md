@@ -1,5 +1,9 @@
 # AQI Predictor for Karachi - 10Pearls Internship Project
 
+For a deep dive into the complete project lifecycle, detailed exploratory data analysis (EDA), performance charts, and architectural breakdowns, please refer to the comprehensive project report:
+
+👉 **[Download the Full Project Report (DOCX)](https://github.com/AbdulBasitKhatri/aqi_predictor/blob/main/Report10PearlsProject.docx)**
+
 ## Executive Summary
 
 This repository documents the complete internship project developed for 10Pearls: a production-oriented Air Quality Index (AQI) prediction platform for Karachi. The system combines data ingestion, feature engineering, exploratory analysis, machine learning, explainability, model registry integration, and deployment automation.

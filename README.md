@@ -1,4 +1,4 @@
-# AQI Predictor for Karachi — 10Pearls Internship Project
+# AQI Predictor for Karachi - 10Pearls Internship Project
 
 ## Executive Summary
 
@@ -224,10 +224,10 @@ The best model is selected by the highest test-set R2 score.
 ### Results artifacts
 
 The training script saves:
-- `aqi_model/metrics.csv` — performance scores for all candidate models,
-- `aqi_model/best_aqi_model.pkl` — the best trained pipeline,
-- `aqi_model/predictions.csv` — actual vs predicted values on test data,
-- `aqi_model/feature_importance.csv` — if the chosen model exposes feature importances,
+- `aqi_model/metrics.csv` - performance scores for all candidate models,
+- `aqi_model/best_aqi_model.pkl` - the best trained pipeline,
+- `aqi_model/predictions.csv` - actual vs predicted values on test data,
+- `aqi_model/feature_importance.csv` - if the chosen model exposes feature importances,
 - SHAP plots: `aqi_model/shap_summary.png` and `aqi_model/shap_bar.png`,
 - LIME instance explanation: `aqi_model/lime_explanation.html`.
 

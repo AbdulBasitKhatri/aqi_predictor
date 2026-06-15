@@ -5,7 +5,7 @@ lightgbm==4.6.0
 lime==0.2.0.1
 matplotlib==3.11.0
 numpy==2.4.6
-pandas==3.0.3
+pandas==2.3.3
 python-dotenv==1.2.2
 Requests==2.34.2
 scikit_learn==1.9.0
